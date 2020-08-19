@@ -43,6 +43,7 @@ public class LightSource : ObjectTrigger, ICheckedInteractable<HandApply>, IAPCP
 	[SerializeField] private Vector4 collLeftSetting = Vector4.zero;
 	[SerializeField] private SpritesDirectional spritesStateOnEffect = null;
 	[SerializeField] private SOLightMountStatesMachine mountStatesMachine = null;
+	[SerializeField] private GameObject sparkingEffectObject;
 	private SOLightMountState currentState;
 
 	private ItemTrait traitRequired;
@@ -363,9 +364,27 @@ public class LightSource : ObjectTrigger, ICheckedInteractable<HandApply>, IAPCP
 			ServerChangeLightState(LightMountState.Broken);
 			Spawn.ServerPrefab("GlassShard", pos, count: Random.Range(0, 2),
 				scatterRadius: Random.Range(0, 2));
+		//	UpdateManager.Add(SparkWhenBulbIsBroken, 1f);
 		}
 	}
-
+/*
+	/// <summary>
+	/// Makes the light mount spark when the bulb/light tube mounted on it is broken
+	/// Rolls a dice between 1 and 5 each second. If the result is 1, it emits sparks.
+	/// </summary>
+	private void SparkWhenBulbIsBroken()
+	{
+		int sparkingDice = Random.Range(1, 6);
+		if (sparkingDice == 1)
+		{
+			sparkingEffectObject.gameObject.SetActive(true);
+		}
+		else
+		{
+			sparkingEffectObject.gameObject.SetActive(false);
+		}
+	}
+*/
 	public void OnDespawnServer(DespawnInfo info)
 	{
 		Spawn.ServerPrefab(currentState.LootDrop, gameObject.RegisterTile().WorldPositionServer);
