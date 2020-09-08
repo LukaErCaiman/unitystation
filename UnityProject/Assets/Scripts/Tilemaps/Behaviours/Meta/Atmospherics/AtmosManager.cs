@@ -18,7 +18,6 @@ public class AtmosManager : MonoBehaviour
 	public bool Running { get; private set; }
 
 	public bool roundStartedServer = false;
-	public HashSet<Pipe> inGamePipes = new HashSet<Pipe>();
 	public HashSet<PipeData> inGameNewPipes = new HashSet<PipeData>();
 	public HashSet<FireAlarm> inGameFireAlarms = new HashSet<FireAlarm>();
 	public static int currentTick;
@@ -32,6 +31,10 @@ public class AtmosManager : MonoBehaviour
 	public bool StopPipes = false;
 
 	public GameObject fireLight = null;
+
+	public GameObject iceShard = null;
+
+	public GameObject hotIce = null;
 
 	private void Awake()
 	{
@@ -89,12 +92,6 @@ public class AtmosManager : MonoBehaviour
 			}
 		}
 
-
-		foreach (Pipe p in inGamePipes)
-		{
-			p.TickUpdate();
-		}
-
 		foreach (FireAlarm firealarm in inGameFireAlarms)
 		{
 			firealarm.TickUpdate();
@@ -127,11 +124,6 @@ public class AtmosManager : MonoBehaviour
 	private IEnumerator SetPipes() /// TODO: FIX ALL MANAGERS LOADING ORDER AND REMOVE ANY WAITFORSECONDS
 	{
 		yield return new WaitForSeconds(2);
-		foreach (var pipe in inGamePipes)
-		{
-			pipe.ServerAttach();
-		}
-
 		roundStartedServer = true;
 	}
 
@@ -140,7 +132,6 @@ public class AtmosManager : MonoBehaviour
 		roundStartedServer = false;
 		AtmosThread.ClearAllNodes();
 		inGameNewPipes.Clear();
-		inGamePipes.Clear();
 	}
 
 
@@ -187,8 +178,7 @@ public class AtmosManager : MonoBehaviour
 		{
 			roundStartedServer = false;
 		}
-		//inGameNewPipes.Clear();
-		inGamePipes.Clear();
+		inGameNewPipes.Clear();
 		inGameFireAlarms.Clear();
 	}
 }

@@ -51,7 +51,7 @@ public class GUI_PreRoundWindow : MonoBehaviour
 	private GameObject characterCustomization = null;
 
 	[SerializeField]
-	private GUI_JobPreferences localJobPref;
+	private GUI_JobPreferences localJobPref = null;
 
 	[SerializeField]
 	private Button characterButton = null;
@@ -278,12 +278,12 @@ public class GUI_PreRoundWindow : MonoBehaviour
 	/// </summary>
 	public void SetUIForJoining()
 	{
+		warnText.SetActive(false);
 		joinPanel.SetActive(true);
 		timerPanel.SetActive(false);
 		playerWaitPanel.SetActive(false);
 		mainPanel.SetActive(true);
 		rejoiningRoundPanel.SetActive(false);
-
 		SetInfoScreenOn();
 	}
 

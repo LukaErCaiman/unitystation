@@ -77,7 +77,8 @@ public class Drawer : NetworkBehaviour, IServerDespawn, ICheckedInteractable<Han
 		SpawnResult traySpawn = Spawn.ServerPrefab(trayPrefab, DrawerWorldPosition);
 		if (!traySpawn.Successful)
 		{
-			throw new MissingReferenceException($"Failed to spawn tray! Is {name} prefab missing reference to tray prefab?");
+			Logger.LogError($"Failed to spawn tray! Is {name} prefab missing reference to {nameof(traySpawn)} prefab?");
+			return;
 		}
 		tray = traySpawn.GameObject;
 
@@ -237,8 +238,6 @@ public class Drawer : NetworkBehaviour, IServerDespawn, ICheckedInteractable<Han
 		var items = Matrix.Get<ObjectBehaviour>(TrayLocalPosition, ObjectType.Item, true);
 		foreach (ObjectBehaviour item in items)
 		{
-			if (item.TryGetComponent(out Pipe pipe) && pipe.anchored) continue;
-
 			// Other position fields such as registerObject.WorldPosition seem to give tile integers.
 			var tileOffsetPosition = TrayWorldPosition - item.transform.position;
 			serverHeldItems.Add(item, tileOffsetPosition);

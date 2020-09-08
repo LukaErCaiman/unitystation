@@ -1,11 +1,10 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using UnityEngine;
 
 namespace Pipes
 {
-	public class MonoPipe : MonoBehaviour,IServerDespawn, ICheckedInteractable<HandApply>
+	public class MonoPipe : MonoBehaviour, IServerDespawn, ICheckedInteractable<HandApply>
 	{
 		public SpriteHandler spritehandler;
 		public GameObject SpawnOnDeconstruct;
@@ -42,11 +41,6 @@ namespace Pipes
 			spritehandler?.SetColor(Colour);
 		}
 
-		void OnDisable()
-		{
-			pipeData.OnDisable();
-		}
-
 		void OnEnable()
 		{
 
@@ -63,19 +57,20 @@ namespace Pipes
 			pipeData.OnDisable();
 		}
 
-		public bool WillInteract(HandApply interaction, NetworkSide side)
+		public virtual bool WillInteract(HandApply interaction, NetworkSide side)
 		{
 			if (!DefaultWillInteract.Default(interaction, side)) return false;
 			if (interaction.TargetObject != gameObject) return false;
 			return true;
 		}
 
-		public void ServerPerformInteraction(HandApply interaction)
+		public virtual void ServerPerformInteraction(HandApply interaction)
 		{
 			if (SpawnOnDeconstruct != null)
 			{
 				if (Validations.HasItemTrait(interaction.UsedObject, CommonTraits.Instance.Wrench))
 				{
+					ToolUtils.ServerPlayToolSound(interaction);
 					var Item = Spawn.ServerPrefab(SpawnOnDeconstruct, registerTile.WorldPositionServer, localRotation : this.transform.localRotation);
 					Item.GameObject.GetComponent<PipeItem>().SetColour(Colour);
 					OnDisassembly(interaction);

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,27 +7,19 @@ using UnityEngine;
 
 namespace Pipes
 {
-	public class PipeItem : NetworkBehaviour, ICheckedInteractable<HandApply>
+	public class PipeItem : NetworkBehaviour, ICheckedInteractable<HandApply>, ICheckedInteractable<HandActivate>
 	{
 		public Color Colour = Color.white;
 
-		[SyncVar(hook = nameof(SetRotation))]
-		public float Netz = 0;
-
-
 		public SpriteHandler SpriteHandler;
 		public RegisterItem registerItem;
+		private PlayerRotatable rotatable;
 
 		private void Awake()
 		{
 			SpriteHandler = this.GetComponentInChildren<SpriteHandler>();
 			registerItem = this.GetComponent<RegisterItem>();
-		}
-
-		public void SetRotation(float Oldz, float Newz)
-		{
-			Netz = Newz;
-			transform.eulerAngles.Set(transform.eulerAngles.x, transform.eulerAngles.y, Newz);
+			rotatable = GetComponent<PlayerRotatable>();
 		}
 
 		public void Start()
@@ -40,6 +32,8 @@ namespace Pipes
 			Colour = newColour;
 			SpriteHandler.SetColor(Colour);
 		}
+
+		#region Interactions
 
 		public virtual bool WillInteract(HandApply interaction, NetworkSide side)
 		{
@@ -70,12 +64,24 @@ namespace Pipes
 						}
 					}
 				}
+				ToolUtils.ServerPlayToolSound(interaction);
 				BuildPipe();
 			}
 
-			this.transform.Rotate(0, 0, -90);
-			SetRotation(Netz,transform.eulerAngles.z);
+			rotatable.Rotate();
 		}
+
+		public virtual bool WillInteract(HandActivate interaction, NetworkSide side)
+		{
+			return DefaultWillInteract.Default(interaction, side);
+		}
+
+		public virtual void ServerPerformInteraction(HandActivate interaction)
+		{
+			rotatable.Rotate();
+		}
+
+		#endregion Interactions
 
 		public virtual void BuildPipe()
 		{
@@ -83,8 +89,7 @@ namespace Pipes
 
 		public virtual Connections GetConnections()
 		{
-			return (null);
+			return null;
 		}
 	}
 }
-

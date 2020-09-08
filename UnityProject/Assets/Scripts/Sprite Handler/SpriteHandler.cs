@@ -52,10 +52,20 @@ public class SpriteHandler : MonoBehaviour
 	private List<SerialisationStanding> Sprites =new List<SerialisationStanding>();
 
 	/// <summary>
+	/// The catalogue index representing the current sprite SO.
+	/// </summary>
+	public int CataloguePage => cataloguePage;
+
+	/// <summary>
 	/// Invokes when sprite just changed by animation or other script
 	/// Null if sprite became hidden
 	/// </summary>
 	public event System.Action<Sprite> OnSpriteChanged;
+
+	/// <summary>
+	/// The amount of SubCatalogues defined for this SpriteHandler.
+	/// </summary>
+	public int CatalogueCount => SubCatalogue.Count;
 
 	/// <summary>
 	/// Current sprite from SpriteRender or Image
@@ -119,7 +129,7 @@ public class SpriteHandler : MonoBehaviour
 	{
 		if (SubCataloguePage == cataloguePage) return;
 
-		if ((SubCataloguePage >= SubCatalogue.Count))
+		if (SubCataloguePage >= SubCatalogue.Count)
 		{
 			Logger.LogError("new SubCataloguePage Is out of bounds on " + this.transform.parent.gameObject);
 			return;
@@ -242,8 +252,8 @@ public class SpriteHandler : MonoBehaviour
 			SubCatalogue = new List<SpriteDataSO>();
 		}
 
-		if (HasSpriteInImageComponent() == false && PresentSpriteSet == null) return;
-
+		if (HasSpriteInImageComponent() == false && PresentSpriteSet == null && cataloguePage == -1) return;
+		cataloguePage = -1;
 		PushClear(false);
 		PresentSpriteSet = null;
 
@@ -277,8 +287,7 @@ public class SpriteHandler : MonoBehaviour
 	{
 		isSubCatalogueChanged = true;
 		SubCatalogue = NewCatalogue;
-		cataloguePage = JumpToPage;
-		if (cataloguePage > -1)
+		if (JumpToPage > -1)
 		{
 			ChangeSprite(JumpToPage, NetWork);
 		}
@@ -331,6 +340,23 @@ public class SpriteHandler : MonoBehaviour
 		TryToggleAnimationState(false);
 	}
 
+	/// <summary>
+	/// Toggles the SpriteRenderer texture. Calls PushTexture() if the new state is on, or PushClear() otherwise.
+	/// </summary>
+	/// <param name="newState">If on, sets the texture (to last known). If off, clears the texture.</param>
+	/// <param name="network">Will send update to clients if true (default).</param>
+	public void ToggleTexture(bool newState, bool network = true)
+	{
+		if (newState)
+		{
+			PushTexture(network);
+		}
+		else
+		{
+			PushClear(network);
+		}
+	}
+
 	private void NetUpdate(
 		SpriteDataSO NewSpriteDataSO = null,
 		int NewVariantIndex = -1,
@@ -346,18 +372,26 @@ public class SpriteHandler : MonoBehaviour
 		if (SpriteHandlerManager.Instance == null) return;
 		if (NetworkIdentity == null)
 		{
-			NetworkIdentity = SpriteHandlerManager.GetRecursivelyANetworkBehaviour(this.gameObject)?.netIdentity;
+			if (this?.gameObject == null) return;
+			var NetID = SpriteHandlerManager.GetRecursivelyANetworkBehaviour(this.gameObject);
+			if (NetID == null)
+			{
+				Logger.LogError("Was unable to find A NetworkBehaviour for ",
+					Category.SpriteHandler);
+				return;
+			};
+
+			NetworkIdentity = NetID.netIdentity;
 			if (NetworkIdentity == null)
 			{
-				Logger.LogError("Was unable to find A NetworkBehaviour for " + gameObject.name,
+				var gamename = "";
+				if (this?.gameObject != null)
+				{
+					gamename = gameObject.name;
+				}
+				Logger.LogError("Was unable to find A NetworkBehaviour for " + gamename,
 					Category.SpriteHandler);
 			}
-		}
-
-		if (NetworkIdentity.netId == 0)
-		{
-			//Logger.Log("ID hasn't been set for " + this.transform.parent);
-			return;
 		}
 
 		if (CustomNetworkManager.Instance._isServer == false) return;
@@ -428,7 +462,34 @@ public class SpriteHandler : MonoBehaviour
 			spriteChange.Pallet = NewPalette;
 		}
 
+		if (NetworkIdentity.netId == 0)
+		{
+			//Logger.Log("ID hasn't been set for " + this.transform.parent);
+			StartCoroutine(WaitForNetInitialisation(spriteChange));
+		}
+		else
+		{
+			SpriteHandlerManager.Instance.QueueChanges[this] = spriteChange;
+		}
+
+	}
+
+	private IEnumerator WaitForNetInitialisation(SpriteHandlerManager.SpriteChange spriteChange)
+	{
+		yield return new WaitForEndOfFrame();
+		if (NetworkIdentity.netId == 0)
+		{
+			Logger.LogError("ID hasn't been set for " + this.transform.parent);
+			yield break;
+		}
+
+		if (SpriteHandlerManager.Instance.QueueChanges.ContainsKey(this))
+		{
+			spriteChange.MergeInto(SpriteHandlerManager.Instance.QueueChanges[this]);
+
+		}
 		SpriteHandlerManager.Instance.QueueChanges[this] = spriteChange;
+
 	}
 
 
@@ -458,6 +519,7 @@ public class SpriteHandler : MonoBehaviour
 	{
 		if (spriteRenderer != null)
 		{
+			spriteRenderer.enabled = true;
 			spriteRenderer.sprite = value;
 			MaterialPropertyBlock block = new MaterialPropertyBlock();
 			spriteRenderer.GetPropertyBlock(block);
@@ -481,6 +543,10 @@ public class SpriteHandler : MonoBehaviour
 			if (value == null)
 			{
 				image.enabled = false;
+			}
+			else
+			{
+				image.enabled = true;
 			}
 		}
 

@@ -29,12 +29,6 @@ namespace Weapons
 		protected GameObject ammoPrefab = null;
 
 		/// <summary>
-		/// Link to the generic internal mag prefab, if this link is incorrect all internal mag weapons will not function!
-		/// </summary>
-		[SerializeField]
-		protected GameObject genericInternalMag = null;
-
-		/// <summary>
 		/// Optional ejected casing override, will default to the standard casing if left null and will only be used if SpawnsCasing is true
 		/// </summary>
 		[SerializeField, Tooltip("Optional casing override, defaults to standard casing when null")]
@@ -77,7 +71,7 @@ namespace Weapons
 
 		/// <summary>
 		/// The cooldown between full bursts in seconds
-		/// <summary>
+		/// </summary>
 		[HideInInspector, Tooltip("The cooldown between full a burst in seconds")] // will be shown by the code at the very end, if appropriate
 		public double burstCooldown = 3;
 
@@ -93,12 +87,6 @@ namespace Weapons
 		/// </summary>
 		[HideInInspector, Tooltip("If the gun should eject an empty mag automatically")] // will be shown by the code at the very end, if appropriate
 		public bool SmartGun = false;
-
-		/// <summary>
-		/// Size of the internal magazine (internal-magazine-specific)
-		/// </summary>
-		[HideInInspector, Tooltip("Size of the internal mag")] // will be shown by the code at the very end, if appropriate
-		public int MagSize = 10;
 
 		/// <summary>
 		/// The the current recoil variance this weapon has reached
@@ -146,8 +134,8 @@ namespace Weapons
 		/// <summary>
 		/// The amount of projectiles spawned per shot
 		/// </summary>
-		[HideInInspector]
-		public int ProjectilesFired = 1;
+		[SerializeField]
+		private int ProjectilesFired = 1;
 
 		//TODO: make this dependent on the mag used/projectile fired
 		/// <summary>
@@ -225,33 +213,17 @@ namespace Weapons
 				//ejecting an internal mag should never be allowed
 				allowMagazineRemoval = false;
 				//populate with a full internal mag on spawn
-				Logger.LogTraceFormat("Auto-populate internal magazine for {0}", Category.Inventory, name);
-
-				//Make generic magazine and modify it to fit weapon
-				GameObject ammoPrefab = genericInternalMag;
-
-				Inventory.ServerAdd(Spawn.ServerPrefab(ammoPrefab).GameObject, magSlot);
-
-				if (CurrentMagazine == null)
-				{
-					Debug.LogError($"{gameObject.name} has null current magazine");
-					return;
-				}
-
-				CurrentMagazine.ChangeSize(MagSize);
-				CurrentMagazine.ammoType = ammoType;
-
-				if (isServer)
-				{
-					CurrentMagazine.ServerSetAmmoRemains(MagSize);
-				}
 			}
-			else
+
+			if (ammoPrefab == null)
 			{
-				//populate with a full external mag on spawn
-				Logger.LogTraceFormat("Auto-populate external magazine for {0}", Category.Inventory, name);
-				Inventory.ServerAdd(Spawn.ServerPrefab(ammoPrefab).GameObject, magSlot);
+				Debug.LogError($"{gameObject.name} magazine prefab was null, cannot auto-populate.");
+				return;
 			}
+
+			//populate with a full external mag on spawn
+			Logger.LogTraceFormat("Auto-populate external magazine for {0}", Category.Inventory, name);
+			Inventory.ServerAdd(Spawn.ServerPrefab(ammoPrefab).GameObject, magSlot);
 		}
 
 		public void OnInventoryMoveServer(InventoryMove info)
@@ -393,7 +365,7 @@ namespace Weapons
 		public bool Interact(HandActivate interaction)
 		{
 			//try ejecting the mag if external
-			if (CurrentMagazine != null && allowMagazineRemoval)
+			if (CurrentMagazine != null && allowMagazineRemoval && !MagInternal)
 			{
 				RequestUnload(CurrentMagazine);
 				return true;
@@ -468,7 +440,7 @@ namespace Weapons
 				DequeueAndProcessServerShot();
 			}
 
-			if (queuedUnload && queuedShots.Count == 0 && allowMagazineRemoval)
+			if (queuedUnload && queuedShots.Count == 0 && allowMagazineRemoval && !MagInternal)
 			{
 				// done processing shot queue,
 				// perform the queued unload action, causing all clients and server to update their version of this Weapon
@@ -678,19 +650,23 @@ namespace Weapons
 			//display the effects of the shot
 
 			//get the bullet prefab being shot
-			GameObject bullet = Spawn.ClientPrefab(Projectile.name,
-				shooter.transform.position, parent: shooter.transform.parent).GameObject;
-			var b = bullet.GetComponent<Projectile>();
+
 			if (isSuicideShot)
 			{
+				GameObject bullet = Spawn.ClientPrefab(Projectile.name,
+					shooter.transform.position, parent: shooter.transform.parent).GameObject;
+				var b = bullet.GetComponent<Projectile>();
 				b.Suicide(shooter, this, damageZone);
 			}
 			else
 			{
 				for (int n = 0; n < ProjectilesFired; n++)
 				{
+					GameObject Abullet = Spawn.ClientPrefab(Projectile.name,
+						shooter.transform.position, parent: shooter.transform.parent).GameObject;
+					var A = Abullet.GetComponent<Projectile>();
 					var finalDirectionOverride = CalcDirection(finalDirection, n);
-					b.Shoot(finalDirectionOverride, shooter, this, damageZone);
+					A.Shoot(finalDirectionOverride, shooter, this, damageZone);
 				}
 			}
 			SoundManager.PlayAtPosition(FiringSound, shooter.transform.position, shooter);
@@ -700,9 +676,9 @@ namespace Weapons
 		private Vector2 CalcDirection(Vector2 direction, int iteration)
 		{
 			float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-			float angleVariance = iteration/1.6f;
+			float angleVariance = iteration/1f;
 			float angleDeviation = Random.Range(-angleVariance, angleVariance);
-			float newAngle = angle * Mathf.Deg2Rad + angleDeviation;
+			float newAngle = (angle+ angleDeviation) * Mathf.Deg2Rad;
 			Vector2 vec2 = new Vector2(Mathf.Cos(newAngle), Mathf.Sin(newAngle)).normalized;
 			return vec2;
 		}
@@ -883,11 +859,8 @@ namespace Weapons
 
 			script.MagInternal = EditorGUILayout.Toggle("Magazine Internal", script.MagInternal);
 
-			if (script.MagInternal) // show exclusive fields depending on whether magazine is internal
+			if (!script.MagInternal) // show exclusive fields depending on whether magazine is internal
 			{
-				script.MagSize = EditorGUILayout.IntField("Internal Magazine Size", script.MagSize);
-			}
-			else{
 				script.SmartGun = EditorGUILayout.Toggle("Smart Gun", script.SmartGun);
 			}
 

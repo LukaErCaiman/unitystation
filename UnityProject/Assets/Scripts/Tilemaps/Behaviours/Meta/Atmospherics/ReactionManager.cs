@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Atmospherics;
@@ -15,12 +16,13 @@ public class ReactionManager : MonoBehaviour
 {
 	public float n = 20;
 
-	[SerializeField]
 	private GameObject fireLight = null;
 
 	private Dictionary<Vector3Int, GameObject> fireLightDictionary = new Dictionary<Vector3Int, GameObject>();
 
 	public Dictionary<Vector3Int, HashSet<Gas>> fogTiles = new Dictionary<Vector3Int, HashSet<Gas>>();
+
+	public ConcurrentDictionary<Vector3Int, HashSet<GasReactions>> reactions = new ConcurrentDictionary<Vector3Int, HashSet<GasReactions>>();
 
 	private static readonly int FIRE_FX_Z = -2;
 
@@ -33,6 +35,8 @@ public class ReactionManager : MonoBehaviour
 
 	private UniqueQueue<FogEffect> addFog; //List of tiles to add chemcial fx to
 	private UniqueQueue<FogEffect> removeFog; //List of tiles to remove the chemical fx from
+
+	private UniqueQueue<ReactionData> addReaction; //List of tiles to add chemcial fx to
 
 	private List<Hotspot> hotspotsToAdd;
 	private List<Vector3Int> hotspotsToRemove;
@@ -59,6 +63,8 @@ public class ReactionManager : MonoBehaviour
 		addFog = new UniqueQueue<FogEffect>();
 		removeFog = new UniqueQueue<FogEffect>();
 
+		addReaction = new UniqueQueue<ReactionData>();
+
 		hotspotsToRemove = new List<Vector3Int>();
 		hotspotsToAdd = new List<Hotspot>();
 		tilemapDamages = GetComponentsInChildren<TilemapDamage>();
@@ -73,6 +79,8 @@ public class ReactionManager : MonoBehaviour
 	{
 		timePassed += Time.deltaTime;
 		timePassed2 += Time.deltaTime;
+
+		#region wind
 
 		Profiler.BeginSample("Wind");
 
@@ -129,6 +137,8 @@ public class ReactionManager : MonoBehaviour
 		timePassed2 = 0;
 
 		Profiler.EndSample();
+
+		#endregion
 
 		if (timePassed < 0.5)
 		{
@@ -222,6 +232,34 @@ public class ReactionManager : MonoBehaviour
 		hotspotsToRemove.Clear();
 		Profiler.EndSample();
 
+		Profiler.BeginSample("GasReactions");
+
+		int gasReactionCount = addReaction.Count;
+		if (gasReactionCount > 0)
+		{
+			for (int i = gasReactionCount; i >= 0; i--)
+			{
+				if (addReaction.TryDequeue(out var addReactionNode))
+				{
+					var gasMix = addReactionNode.metaDataNode.GasMix;
+
+					addReactionNode.gasReaction.Reaction.React(ref gasMix, addReactionNode.metaDataNode.Position);
+
+					if (reactions.TryGetValue(addReactionNode.metaDataNode.Position, out var gasHashSet) && gasHashSet.Count == 1)
+					{
+						reactions.TryRemove(addReactionNode.metaDataNode.Position, out var value);
+						continue;
+					}
+
+					reactions[addReactionNode.metaDataNode.Position].Remove(addReactionNode.gasReaction);
+				}
+			}
+		}
+
+		Profiler.EndSample();
+
+		#region TileOverlays
+
 		Profiler.BeginSample("FogModifyAdd");
 		//Here we check to see if chemical fog fx needs to be applied, and if so, add them. If not, we remove them
 		int addFogCount = addFog.Count;
@@ -280,6 +318,8 @@ public class ReactionManager : MonoBehaviour
 		}
 
 		Profiler.EndSample();
+
+		#endregion
 
 		timePassed = 0;
 	}
@@ -444,6 +484,24 @@ public class ReactionManager : MonoBehaviour
 		removeFog.Enqueue(node);
 	}
 
+	//Add tile to add reaction effect queue
+	//Being called by AtmosSimulation
+	public void AddReactionEvent(ReactionData node)
+	{
+		if (reactions.TryGetValue(node.metaDataNode.Position, out var gasHastSet))
+		{
+			if(gasHastSet.Contains(node.gasReaction)) return;
+
+			gasHastSet.Add(node.gasReaction);
+		}
+		else
+		{
+			reactions.TryAdd(node.metaDataNode.Position, new HashSet<GasReactions>{node.gasReaction});
+		}
+
+		addReaction.Enqueue(node);
+	}
+
 	/// <summary>
 	/// So we can avoid GC caused by creating lambdas, we create one instance of this and re-use it when
 	/// applying a fire exposure to multiple objects
@@ -488,5 +546,11 @@ public class ReactionManager : MonoBehaviour
 	{
 		public MetaDataNode metaDataNode;
 		public Gas gas;
+	}
+
+	public class ReactionData
+	{
+		public MetaDataNode metaDataNode;
+		public GasReactions gasReaction;
 	}
 }

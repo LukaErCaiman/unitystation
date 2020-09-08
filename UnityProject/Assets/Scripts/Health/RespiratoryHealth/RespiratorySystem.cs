@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using Atmospherics;
-using Objects;
+using Objects.GasContainer;
 using UnityEngine;
 
 /// <inheritdoc />
@@ -91,10 +91,10 @@ public class RespiratorySystem : MonoBehaviour //Do not turn into NetBehaviour
 			}
 
 			if(livingHealthBehaviour.OverallHealth >= HealthThreshold.SoftCrit){
-				//if (Breathe(node))
-				//	{
-				//		AtmosManager.Update(node);
-				//	}
+				if (Breathe(node))
+				{
+					AtmosManager.Update(node);
+				}
 			}
 			else{
 				bloodSystem.OxygenDamage += 1;
@@ -120,7 +120,7 @@ public class RespiratorySystem : MonoBehaviour //Do not turn into NetBehaviour
 		{
 			breathGasMix.RemoveGas(Gas.Oxygen, oxygenUsed);
 			node.GasMix.AddGas(Gas.CarbonDioxide, oxygenUsed);
-			registerTile.Matrix.MetaDataLayer.UpdateSystemsAt(registerTile.LocalPositionClient);
+			registerTile.Matrix.MetaDataLayer.UpdateSystemsAt(registerTile.LocalPositionClient, SystemType.AtmosSystem);
 		}
 
 		gasMix += breathGasMix;
